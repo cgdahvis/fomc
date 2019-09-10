@@ -1,0 +1,79 @@
+%pylab inline
+import seleniumfrom selenium.webdriver.support.select 
+import Selectimport pandas as pdfrom selenium 
+import webdriver
+import numpy as np
+import re
+import seaborn as sns
+
+path2 = r"C:\webdrivers\chromedriver.exe"    #for chromedriverdriver = webdriver.Chrome(path2)
+driver.set_window_size(1024, 768) # optional
+url = 'https://www.federalreserve.gov/newsevents/speeches.htm'
+driver.get(url)links= driver.find_elements_by_class_name("ng-binding")
+urls = []
+title = []
+text=[]date=[]
+speaker=[]
+
+for i in links:       
+  urls.append(i.get_attribute('href')) #creates list of URLs without navigating/clicking    
+
+urls=list(filter(None, urls)) #filter gets ride of the None
+
+#try pg 2 of url and append
+driver.find_element_by_link_text('2').click()
+
+links= driver.find_elements_by_class_name("ng-binding")
+
+for i in links:       
+  urls.append(i.get_attribute('href'))    
+
+urls=list(filter(None, urls))#PAGE 3
+driver.find_element_by_link_text('3').click()
+
+links= driver.find_elements_by_class_name("ng-binding")
+
+for i in links:       
+  urls.append(i.get_attribute('href'))    
+
+urls=list(filter(None, urls))#now have all the urls, need to scrape data
+
+for url in urls:    
+  driver.get(url) #navigates to pg    
+  title.append(driver.find_element_by_class_name('title').text) #retrieves desired info    
+  text.append(driver.find_element_by_id('content').text)    
+  date.append(driver.find_element_by_xpath('//*[@id="article"]/div[1]/p[1]').text)    
+  speaker.append(driver.find_element_by_class_name('speaker').text)    
+  #dates.append(driver.find_element_by_xpath('//*[@id="ux-page"]/div/div[3]/table/tbody/tr/td/table/tbody/tr/td/p[13]').text) #retrieve closing dates
+
+df=pd.DataFrame({"title":title,"text":text,'date':date,'speaker':speaker})
+
+df['date']=pd.to_datetime(df['date'])
+
+df['inflation']=df['text'].str.count(('inflation'))
+df=df.sort_values(by='date', ascending =True)
+df['inflation_rolling_10']=df['inflation'].rolling(10).sum()
+
+
+
+
+df['global']=df['text'].str.count(('global'))+df['text'].str.count(('international'))+df['text'].str.count(('emptive'))
+df=df.sort_values(by='date', ascending =True)
+df['global_rolling_10']=df['global'].rolling(10).sum()
+
+
+df['slow2']=df['text'].str.count(('slow'))+df['text'].str.count(('stall'))+df['text'].str.count(('soften'))+df['text'].str.count(('weak'))
+df=df.sort_values(by='date', ascending =True)
+df['slow2_rolling_10']=df['slow2'].rolling(10).sum()
+df['global_slowing']=df['slow2_rolling_10']+df['global_rolling_10']
+
+
+
+sns.set_style('dark')
+y='global_slowing'
+ax=sns.lineplot(data=df,x='date',y=y,color='black')
+ax=ax.twinx()
+ax2=sns.lineplot(data=SP500)
+fig = mpl.pyplot.gcf()
+fig.set_size_inches(23,14)
+plt.title('Rolling 10 Fed speeches: Global/Softening References vs S&P 500')
